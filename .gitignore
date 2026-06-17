@@ -1,0 +1,55 @@
+# ───────────────────────────── macOS ─────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# ──────────────────────────── Xcode ──────────────────────────────
+# Build products / derived data. This project builds into ./build via
+# `xcodebuild -derivedDataPath build`, and release artifacts land in
+# build/release — all ignored.
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Per-user Xcode state (window layout, breakpoints, selected scheme, etc.)
+# Keep *shared* schemes (xcshareddata) so the ClawdDochi scheme is committable.
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Xcode 8+ workspace cruft
+*.xcworkspace/xcuserdata/
+
+# ─────────────────────── Swift Package Manager ───────────────────
+.build/
+.swiftpm/
+Package.resolved
+
+# ───────────────────────── Signing / secrets ─────────────────────
+# Never commit signing material or notarization credentials.
+*.p12
+*.cer
+*.certSigningRequest
+*.provisionprofile
+*.mobileprovision
+
+# ──────────────────────── Release artifacts ──────────────────────
+*.xcarchive
+*.dmg
+*.zip
+
+# ─────────────────────────── Misc ────────────────────────────────
+*.log
+.netrc
+
+# NOTE: previews/ (the exported dochi-*.png) IS committed on purpose — it is
+# the inspection surface for Dochi's artwork. Do not ignore it.
