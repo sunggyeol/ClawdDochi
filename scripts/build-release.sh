@@ -57,9 +57,29 @@ APP="$EXPORT_DIR/ClawdDochi.app"
 # stripped. Sign the nested helper first, then the outer app bundle. Hardened
 # Runtime + secure timestamp are required for notarization.
 IDENTITY="Developer ID Application"
+sign() { codesign --force --options runtime --timestamp --sign "$IDENTITY" "$@"; }
+
+# Sparkle ships its nested helpers pre-signed (without our Developer ID or a
+# secure timestamp), which notarization rejects. Re-sign the framework's nested
+# code inside-out with our Developer ID + Hardened Runtime + timestamp.
+FW="$APP/Contents/Frameworks/Sparkle.framework"
+if [[ -d "$FW" ]]; then
+    echo ">> Re-signing Sparkle.framework nested code ..."
+    V="$FW/Versions/Current"
+    [[ -d "$V/XPCServices/Downloader.xpc" ]] && sign "$V/XPCServices/Downloader.xpc"
+    [[ -d "$V/XPCServices/Installer.xpc" ]] && sign "$V/XPCServices/Installer.xpc"
+    [[ -d "$V/Updater.app" ]] && sign --deep "$V/Updater.app"
+    [[ -e "$V/Autoupdate" ]] && sign "$V/Autoupdate"
+    sign "$FW"
+fi
+
+# Re-sign WITHOUT any entitlements so the debug-only get-task-allow entitlement
+# (which the build/CodeSignOnCopy injects and which notarization rejects) is
+# stripped. Sign the nested helper first, then the outer app bundle. Hardened
+# Runtime + secure timestamp are required for notarization.
 echo ">> Re-signing helper + app (stripping get-task-allow) ..."
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP/Contents/Helpers/dochi-cli"
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+sign "$APP/Contents/Helpers/dochi-cli"
+sign "$APP"
 
 echo ">> Verifying signature ..."
 codesign -dvvv "$APP" 2>&1 | grep -E 'Authority=Developer ID|flags=' || true
