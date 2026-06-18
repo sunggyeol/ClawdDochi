@@ -14,11 +14,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
     private var petWindow: PetWindowController?
     private var signalReceiver: SignalReceiver?
+    private let updater = UpdaterController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Headless path: render preview PNGs and exit without any UI.
         if let dir = PreviewExporter.requestedDirectory() {
             PreviewExporter.runAndExit(to: dir)
+            return
+        }
+
+        // Headless path: render the app icon and exit.
+        if let path = PreviewExporter.requestedIconPath() {
+            PreviewExporter.renderIconAndExit(to: path)
             return
         }
 
@@ -32,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `.accessory` keeps us out of the Dock and the app switcher.
         NSApp.setActivationPolicy(.accessory)
 
-        statusItemController = StatusItemController(appController: appController)
+        statusItemController = StatusItemController(appController: appController, updater: updater)
 
         let pet = PetWindowController()
         pet.attach(to: appController)

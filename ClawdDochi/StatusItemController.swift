@@ -14,14 +14,16 @@ import AppKit
 final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let appController: AppController
+    private let updater: UpdaterController
     private let settings = DochiSettings.shared
 
     private var frames: [NSImage] = []
     private var frameIndex = 0
     private var timer: Timer?
 
-    init(appController: AppController) {
+    init(appController: AppController, updater: UpdaterController) {
         self.appController = appController
+        self.updater = updater
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -74,19 +76,31 @@ final class StatusItemController: NSObject {
     private func buildMenu() {
         let menu = NSMenu()
 
-        // TEMPORARY debug submenu to set each state manually.
-        let debugItem = NSMenuItem(title: "Debug: Set State", action: nil, keyEquivalent: "")
-        let debugMenu = NSMenu()
-        for state in AgentState.allCases {
-            let item = NSMenuItem(title: state.rawValue.capitalized,
-                                  action: #selector(debugSetState(_:)),
-                                  keyEquivalent: "")
+        // Mode: react to Claude Code, or roam autonomously.
+        let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
+        let modeMenu = NSMenu()
+        for driver in DochiDriver.allCases {
+            let item = NSMenuItem(title: driver.label, action: #selector(setDriver(_:)), keyEquivalent: "")
             item.target = self
-            item.representedObject = state.rawValue
-            debugMenu.addItem(item)
+            item.representedObject = driver.rawValue
+            item.state = (settings.driver == driver) ? .on : .off
+            modeMenu.addItem(item)
         }
-        debugItem.submenu = debugMenu
-        menu.addItem(debugItem)
+        modeItem.submenu = modeMenu
+        menu.addItem(modeItem)
+
+        // Movement style.
+        let moveItem = NSMenuItem(title: "Movement", action: nil, keyEquivalent: "")
+        let moveMenu = NSMenu()
+        for style in MovementStyle.allCases {
+            let item = NSMenuItem(title: style.label, action: #selector(setMovement(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = style.rawValue
+            item.state = (settings.movement == style) ? .on : .off
+            moveMenu.addItem(item)
+        }
+        moveItem.submenu = moveMenu
+        menu.addItem(moveItem)
 
         menu.addItem(.separator())
 
@@ -105,20 +119,11 @@ final class StatusItemController: NSObject {
 
         menu.addItem(.separator())
 
-        // Claude Code hook integration. Writes are gated behind an NSAlert.
-        let enabled = HookInstaller.isEnabled(at: HookInstaller.defaultSettingsURL())
-        let enableItem = NSMenuItem(title: "Enable Claude Code Integration",
-                                    action: #selector(enableIntegration),
+        let updateItem = NSMenuItem(title: "Check for Updates…",
+                                    action: #selector(checkForUpdates),
                                     keyEquivalent: "")
-        enableItem.target = self
-        enableItem.state = enabled ? .on : .off
-        menu.addItem(enableItem)
-
-        let disableItem = NSMenuItem(title: "Disable Claude Code Integration",
-                                     action: #selector(disableIntegration),
-                                     keyEquivalent: "")
-        disableItem.target = self
-        menu.addItem(disableItem)
+        updateItem.target = self
+        menu.addItem(updateItem)
 
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit ClawdDochi",
@@ -128,15 +133,63 @@ final class StatusItemController: NSObject {
         statusItem.menu = menu
     }
 
-    @objc private func debugSetState(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let state = AgentState(rawValue: raw) else { return }
-        appController.setState(state)
+    @objc private func setDriver(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let v = DochiDriver(rawValue: raw) else { return }
+        settings.driver = v
+        // Mode also manages the Claude Code hooks in ~/.claude/settings.json,
+        // so the two are never out of sync. Writes are confirmed via NSAlert.
+        let url = HookInstaller.defaultSettingsURL()
+        let hooksInstalled = HookInstaller.isEnabled(at: url)
+        switch v {
+        case .claudeCode where !hooksInstalled:
+            promptInstallHooks(url: url)
+        case .autonomous where hooksInstalled:
+            promptRemoveHooks()
+        default:
+            break
+        }
+        buildMenu()
+    }
+
+    private func promptInstallHooks(url: URL) {
+        let alert = NSAlert()
+        alert.messageText = "Enable Claude Code integration?"
+        alert.informativeText = """
+        Dochi needs four hooks in \(url.path) so Claude Code can tell it when a \
+        prompt starts, needs attention, or finishes. Your existing hooks are \
+        preserved. Without them, Claude Code Integration mode has nothing to react to.
+        """
+        alert.addButton(withTitle: "Install Hooks")
+        alert.addButton(withTitle: "Not Now")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { try HookInstaller.enableInRealSettings() } catch { presentError(error) }
+    }
+
+    private func promptRemoveHooks() {
+        let alert = NSAlert()
+        alert.messageText = "Remove Claude Code hooks?"
+        alert.informativeText = "Autonomous mode ignores Claude Code. Remove ClawdDochi's hooks from your Claude Code settings? Only ClawdDochi's entries are removed."
+        alert.addButton(withTitle: "Remove Hooks")
+        alert.addButton(withTitle: "Keep Them")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do { try HookInstaller.disableInRealSettings() } catch { presentError(error) }
+    }
+
+    @objc private func setMovement(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let v = MovementStyle(rawValue: raw) else { return }
+        settings.movement = v
+        buildMenu()
     }
 
     @objc private func toggleShowDochi() {
         settings.showDochi.toggle()
         buildMenu()
+    }
+
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
     }
 
     // MARK: - Settings menu
@@ -206,36 +259,7 @@ final class StatusItemController: NSObject {
         buildMenu()
     }
 
-    // MARK: - Hook integration actions
-
-    @objc private func enableIntegration() {
-        let url = HookInstaller.defaultSettingsURL()
-        let alert = NSAlert()
-        alert.messageText = "Enable Claude Code integration?"
-        alert.informativeText = """
-        ClawdDochi will add four hooks to \(url.path) that run its bundled \
-        helper when Claude Code starts a prompt, needs attention, or finishes. \
-        Your existing hooks are preserved.
-        """
-        alert.addButton(withTitle: "Enable")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do { try HookInstaller.enableInRealSettings() } catch { presentError(error) }
-        buildMenu()
-    }
-
-    @objc private func disableIntegration() {
-        let alert = NSAlert()
-        alert.messageText = "Disable Claude Code integration?"
-        alert.informativeText = "ClawdDochi will remove only its own hooks, leaving all others intact."
-        alert.addButton(withTitle: "Disable")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        do { try HookInstaller.disableInRealSettings() } catch { presentError(error) }
-        buildMenu()
-    }
+    // MARK: - Hook integration
 
     private func presentError(_ error: Error) {
         let alert = NSAlert()

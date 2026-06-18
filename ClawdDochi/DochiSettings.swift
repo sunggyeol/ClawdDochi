@@ -61,6 +61,32 @@ enum CelebrationStyle: String, CaseIterable, Sendable {
     }
 }
 
+/// Whether Dochi reacts to Claude Code, or just lives its own life.
+enum DochiDriver: String, CaseIterable, Sendable {
+    case claudeCode  // gestures/animation react to Claude Code agent state
+    case autonomous  // ignores Claude Code; roams on its own
+
+    var label: String {
+        switch self {
+        case .claudeCode: return "Claude Code Integration"
+        case .autonomous: return "Autonomous"
+        }
+    }
+}
+
+/// How Dochi moves around the screen.
+enum MovementStyle: String, CaseIterable, Sendable {
+    case edgeWalk     // walks the full screen-edge perimeter, facing travel
+    case screensaver  // DVD-style: drifts fast across the screen, bounces off walls
+
+    var label: String {
+        switch self {
+        case .edgeWalk:    return "Edge Walk"
+        case .screensaver: return "Screensaver (Bounce)"
+        }
+    }
+}
+
 @MainActor
 final class DochiSettings {
     static let shared = DochiSettings()
@@ -71,6 +97,8 @@ final class DochiSettings {
         static let appearance = "dochi.appearance"
         static let celebration = "dochi.celebration"
         static let show = "dochi.show"
+        static let driver = "dochi.driver"
+        static let movement = "dochi.movement"
     }
 
     private var observers: [() -> Void] = []
@@ -83,7 +111,7 @@ final class DochiSettings {
     private func notify() { observers.forEach { $0() } }
 
     var size: DochiSize {
-        get { DochiSize(rawValue: defaults.string(forKey: Key.size) ?? "") ?? .medium }
+        get { DochiSize(rawValue: defaults.string(forKey: Key.size) ?? "") ?? .small }
         set { defaults.set(newValue.rawValue, forKey: Key.size); notify() }
     }
 
@@ -101,5 +129,15 @@ final class DochiSettings {
     var showDochi: Bool {
         get { defaults.object(forKey: Key.show) == nil ? true : defaults.bool(forKey: Key.show) }
         set { defaults.set(newValue, forKey: Key.show); notify() }
+    }
+
+    var driver: DochiDriver {
+        get { DochiDriver(rawValue: defaults.string(forKey: Key.driver) ?? "") ?? .claudeCode }
+        set { defaults.set(newValue.rawValue, forKey: Key.driver); notify() }
+    }
+
+    var movement: MovementStyle {
+        get { MovementStyle(rawValue: defaults.string(forKey: Key.movement) ?? "") ?? .edgeWalk }
+        set { defaults.set(newValue.rawValue, forKey: Key.movement); notify() }
     }
 }

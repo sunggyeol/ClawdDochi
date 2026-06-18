@@ -9,6 +9,9 @@ cask "clawd-dochi" do
 
   depends_on macos: ">= :tahoe"
 
+  # The app updates itself via Sparkle, so Homebrew should not flag it stale.
+  auto_updates true
+
   app "ClawdDochi.app"
 
   # Expose the bundled helper on PATH so Claude Code hooks can call it directly.

@@ -35,8 +35,16 @@ final class PetWindowController: NSObject {
                                     height: DochiMetrics.canvasSize)
     /// Resting position of dochiNode within the container (gestures return here).
     private var baseNodePosition: CGPoint = .zero
-    /// Last state applied, so a live restyle can re-apply the right gesture.
+    /// Effective state currently animating (idle in Autonomous mode).
     private var currentState: AgentState = .idle
+    /// Raw Claude Code state last received (so toggling Mode re-evaluates).
+    private var rawState: AgentState = .idle
+
+    // Screensaver bounce state.
+    private var ssCenter: CGPoint = .zero
+    private var ssVel: CGPoint = CGPoint(x: 0.82, y: 0.57)
+    /// Screensaver moves faster than edge-walking (× the wander speed).
+    private static let screensaverSpeedFactor: CGFloat = 1.56
 
     // MARK: - Wandering state
 
@@ -49,15 +57,18 @@ final class PetWindowController: NSObject {
     /// Travel direction around the perimeter: +1 clockwise-ish, -1 reversed.
     private var travelDir: CGFloat = 1
     /// Remaining distance before randomly reversing direction.
-    private var distanceUntilReverse: CGFloat = 500
+    private var distanceUntilReverse: CGFloat = 1200
+    /// Half the creature's height (scaled) — how far its feet reach from the
+    /// window center, used to hug the screen edge closely while staying visible.
+    private var creatureReach: CGFloat = 64
 
     /// Edge-walk speed per state. `waiting`/`done` stay put so the gesture reads.
     private func speed(for state: AgentState) -> CGFloat {
         switch state {
-        case .idle:    return 22   // strolls around when Claude is done/idle
-        case .working: return 38   // brisker pacing while busy
-        case .waiting: return 0    // hold for the attention gesture
-        case .done:    return 0    // hold for the celebration
+        case .idle:    return 28   // roams around when Claude is done/idle
+        case .working: return 42   // brisk pacing while busy
+        case .waiting: return 18   // keeps moving while waiting (never frozen)
+        case .done:    return 0    // briefly holds for the celebration, then idle
         }
     }
 
@@ -127,6 +138,10 @@ final class PetWindowController: NSObject {
         let headroom: CGFloat = 60          // hop/bristle slack
         let side = (diagonal + headroom) * s
         windowSize = NSSize(width: side, height: side)
+        // Feet reach from the creature's center toward whichever edge it walks —
+        // lets the window hang off-screen so Dochi hugs the edge while staying
+        // fully visible.
+        creatureReach = (art.height / 2) * s
 
         scaleContainer.setScale(s)
         scaleContainer.position = CGPoint(x: side / 2, y: side / 2)
@@ -147,8 +162,25 @@ final class PetWindowController: NSObject {
         dochi = DochiSprite(appearance: settings.appearance)
         scaleContainer.addChild(dochi.node)
         layout()
-        applyGesture(currentState)
+        resetMovementState()
+        applyGesture(rawState)   // re-evaluate driver (Claude vs autonomous)
         applyVisibility()
+    }
+
+    /// (Re)initialize the wander/bounce state — call on show and on any
+    /// movement/size change so the new style starts cleanly without jumps.
+    private func resetMovementState() {
+        travelDir = 1
+        pathProgress = perimeterLength() * 0.15
+        distanceUntilReverse = perimeterLength() * CGFloat(Int.random(in: 1...2))
+
+        let r = centerRect()
+        let fx = min(max(window.frame.midX, r.minX), r.maxX)
+        let fy = min(max(window.frame.midY, r.minY), r.maxY)
+        ssCenter = NSPoint(x: fx, y: fy)
+        let ang = CGFloat.random(in: 0.45...1.0)   // ~26–57° diagonal
+        ssVel = NSPoint(x: cos(ang) * (Bool.random() ? 1 : -1),
+                        y: sin(ang) * (Bool.random() ? 1 : -1))
     }
 
     /// Show or hide the pet window per the user's setting.
@@ -173,9 +205,12 @@ final class PetWindowController: NSObject {
         }
     }
 
-    /// Run the gesture animation for `state` on the Dochi node.
+    /// Run the gesture animation for `state` on the Dochi node. In Autonomous
+    /// mode, Dochi ignores Claude Code's state and just behaves as idle (roams).
     func applyGesture(_ state: AgentState) {
-        currentState = state
+        rawState = state
+        let effective: AgentState = (settings.driver == .autonomous) ? .idle : state
+        currentState = effective
         let node = dochi.node
         node.removeAction(forKey: DochiSprite.idleKey)
         node.removeAction(forKey: DochiSprite.gestureKey)
@@ -184,9 +219,9 @@ final class PetWindowController: NSObject {
         node.position = baseNodePosition   // recover from any interrupted hop
 
         // Legs animate independently of the body gesture.
-        dochi.animateLegs(for: state)
+        dochi.animateLegs(for: effective)
 
-        wanderSpeed = speed(for: state)
+        wanderSpeed = speed(for: effective)
 
         // Stationary states stand upright so the gesture reads cleanly; moving
         // states let stepWander rotate the body to face travel.
@@ -196,7 +231,7 @@ final class PetWindowController: NSObject {
             scaleContainer.yScale = settings.size.scale
         }
 
-        switch state {
+        switch effective {
         case .idle:
             node.run(dochi.idleAction(), withKey: DochiSprite.idleKey)
         case .working:
@@ -209,15 +244,19 @@ final class PetWindowController: NSObject {
                 self?.appController?.returnToIdle()
             })
             node.run(celebrate, withKey: DochiSprite.celebrationKey)
+            // Failsafe: no matter what, never stay stuck in `done` — force a
+            // return to idle (which wanders) a few seconds later. returnToIdle
+            // is a no-op if we already left `done`.
+            node.run(.sequence([.wait(forDuration: 4.0),
+                                .run { [weak self] in self?.appController?.returnToIdle() }]),
+                     withKey: "dochi.doneFailsafe")
         }
     }
 
-    /// Show the window and start the edge-wandering loop.
+    /// Show the window and start the wandering loop.
     func show() {
-        // Start partway along the bottom edge.
-        pathProgress = perimeterLength() * 0.15
-        distanceUntilReverse = CGFloat.random(in: 300...700)
-        window.setFrameOrigin(pathPoint(pathProgress).origin)
+        resetMovementState()
+        window.setFrameOrigin(origin(forCenter: pathPoint(pathProgress).center))
         applyVisibility()
         startWandering()
     }
@@ -239,57 +278,92 @@ final class PetWindowController: NSObject {
         let dt = min(now - lastTick, 0.1) // clamp after stalls
         lastTick = now
         guard wanderSpeed > 0 else { return }
-
-        let total = perimeterLength()
         let step = wanderSpeed * CGFloat(dt)
 
-        // Advance along the perimeter in the current direction; occasionally
-        // reverse so Dochi loops clockwise for a while, then the other way.
+        switch settings.movement {
+        case .edgeWalk:    stepPerimeter(step: step, dt: dt)
+        case .screensaver: stepScreensaver(step: step, dt: dt)
+        }
+    }
+
+    /// Full-perimeter loop; reverse direction after 1–2 complete laps.
+    private func stepPerimeter(step: CGFloat, dt: TimeInterval) {
+        let total = perimeterLength()
         pathProgress = (pathProgress + travelDir * step).truncatingRemainder(dividingBy: total)
         if pathProgress < 0 { pathProgress += total }
         distanceUntilReverse -= step
         if distanceUntilReverse <= 0 {
             travelDir = -travelDir
-            distanceUntilReverse = CGFloat.random(in: 300...750)
+            distanceUntilReverse = total * CGFloat(Int.random(in: 1...2))
         }
-
         let p = pathPoint(pathProgress)
-        window.setFrameOrigin(p.origin)
-
-        // Orient the body so its feet stay on the edge it's walking along
-        // (rotate toward the edge tangent), and mirror it horizontally to point
-        // the snout in the travel direction. This keeps Dochi upright when it
-        // turns around on the bottom (just flips) and "climbs" the side walls,
-        // always facing the way it's going — without ever going belly-up except
-        // along the very top edge.
-        let cur = scaleContainer.zRotation
-        let delta = atan2(sin(p.tangent - cur), cos(p.tangent - cur)) // shortest turn
-        let maxStep = 7.0 * CGFloat(dt)                                // smooth corner turns
-        scaleContainer.zRotation = cur + max(-maxStep, min(maxStep, delta))
-
-        let s = settings.size.scale
-        scaleContainer.yScale = s
-        scaleContainer.xScale = travelDir > 0 ? s : -s   // mirror when reversed
+        window.setFrameOrigin(origin(forCenter: p.center))
+        orientToEdge(tangent: p.tangent, dt: dt)
     }
 
-    /// The rectangle (origin space) the window's bottom-left corner walks around.
-    private func walkRect() -> NSRect {
+    /// DVD-logo style: drift in a straight line, bounce off the screen walls.
+    /// A bit brisker than edge-walking (1.2× the wander speed).
+    private func stepScreensaver(step: CGFloat, dt: TimeInterval) {
+        let move = step * Self.screensaverSpeedFactor
+        let r = centerRect()
+        ssCenter.x += ssVel.x * move
+        ssCenter.y += ssVel.y * move
+        if ssCenter.x <= r.minX { ssCenter.x = r.minX; ssVel.x = abs(ssVel.x) }
+        if ssCenter.x >= r.maxX { ssCenter.x = r.maxX; ssVel.x = -abs(ssVel.x) }
+        if ssCenter.y <= r.minY { ssCenter.y = r.minY; ssVel.y = abs(ssVel.y) }
+        if ssCenter.y >= r.maxY { ssCenter.y = r.maxY; ssVel.y = -abs(ssVel.y) }
+        window.setFrameOrigin(origin(forCenter: ssCenter))
+
+        // Stay upright; face horizontal travel direction.
+        let s = settings.size.scale
+        let cur = scaleContainer.zRotation
+        let delta = atan2(sin(-cur), cos(-cur))
+        let maxStep = 8.0 * CGFloat(dt)
+        scaleContainer.zRotation = cur + max(-maxStep, min(maxStep, delta))
+        scaleContainer.yScale = s
+        scaleContainer.xScale = ssVel.x >= 0 ? s : -s
+    }
+
+    /// Rotate the body so its feet stay on the current edge (toward the tangent)
+    /// and mirror it to face the travel direction.
+    private func orientToEdge(tangent: CGFloat, dt: TimeInterval) {
+        let cur = scaleContainer.zRotation
+        let delta = atan2(sin(tangent - cur), cos(tangent - cur)) // shortest turn
+        let maxStep = 7.0 * CGFloat(dt)
+        scaleContainer.zRotation = cur + max(-maxStep, min(maxStep, delta))
+        let s = settings.size.scale
+        scaleContainer.yScale = s
+        scaleContainer.xScale = travelDir > 0 ? s : -s
+    }
+
+
+    /// Rectangle that the creature's CENTER walks around, inset from the visible
+    /// frame by just the feet reach (+ a small gap) so Dochi hugs the edge. The
+    /// (larger, transparent) window hangs off-screen beyond the edge.
+    private func centerRect() -> NSRect {
         let vf = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let w = max(vf.width - windowSize.width, 1)
-        let h = max(vf.height - windowSize.height, 1)
-        return NSRect(x: vf.minX, y: vf.minY, width: w, height: h)
+        let gap: CGFloat = 6
+        let inset = creatureReach + gap
+        let w = max(vf.width - inset * 2, 1)
+        let h = max(vf.height - inset * 2, 1)
+        return NSRect(x: vf.minX + inset, y: vf.minY + inset, width: w, height: h)
     }
 
     private func perimeterLength() -> CGFloat {
-        let r = walkRect()
+        let r = centerRect()
         return 2 * (r.width + r.height)
     }
 
-    /// Map a perimeter distance to a window origin and the forward heading angle
+    /// Convert a creature-center point to the window's bottom-left origin.
+    private func origin(forCenter c: NSPoint) -> NSPoint {
+        NSPoint(x: c.x - windowSize.width / 2, y: c.y - windowSize.height / 2)
+    }
+
+    /// Map a perimeter distance to the creature CENTER and forward heading angle
     /// (direction of increasing progress; Dochi's snout points along this).
-    private func pathPoint(_ progress: CGFloat) -> (origin: NSPoint, tangent: CGFloat) {
-        let r = walkRect()
+    private func pathPoint(_ progress: CGFloat) -> (center: NSPoint, tangent: CGFloat) {
+        let r = centerRect()
         var d = progress
         // Bottom edge: left -> right (heading +x).
         if d < r.width {

@@ -65,6 +65,78 @@ enum PreviewExporter {
         NSApp.terminate(nil)
     }
 
+    // MARK: - App icon
+
+    /// `--export-icon <path.png>` writes a 1024×1024 app icon (Dochi on a soft
+    /// rounded-square background) and exits.
+    static func requestedIconPath() -> String? {
+        let args = CommandLine.arguments
+        guard let idx = args.firstIndex(of: "--export-icon"), idx + 1 < args.count
+        else { return nil }
+        return args[idx + 1]
+    }
+
+    static func renderIconAndExit(to path: String) {
+        if let data = composeIcon(size: 1024) {
+            try? data.write(to: URL(fileURLWithPath: path))
+            print("exported \(path)")
+        } else {
+            FileHandle.standardError.write(Data("ClawdDochi: failed to render icon\n".utf8))
+        }
+        NSApp.terminate(nil)
+    }
+
+    /// Compose the app icon: warm rounded-square background + the colored Dochi.
+    private static func composeIcon(size: CGFloat) -> Data? {
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size), pixelsHigh: Int(size),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+
+        let rect = NSRect(x: 0, y: 0, width: size, height: size)
+        let radius = size * 0.2237   // macOS app-icon corner ratio
+        let bg = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        let gradient = NSGradient(colors: [
+            NSColor(calibratedRed: 0.99, green: 0.95, blue: 0.86, alpha: 1),  // cream (top)
+            NSColor(calibratedRed: 0.97, green: 0.81, blue: 0.69, alpha: 1),  // peach (bottom)
+        ])
+        gradient?.draw(in: bg, angle: -90)
+
+        // Colored Dochi, centered, filling ~72% of the icon.
+        if let cg = dochiCGImage(canvas: size * 0.72, appearance: .color) {
+            let dw = size * 0.72
+            let img = NSImage(cgImage: cg, size: NSSize(width: dw, height: dw))
+            let drect = NSRect(x: (size - dw) / 2, y: (size - dw) / 2 - size * 0.015,
+                               width: dw, height: dw)
+            img.draw(in: drect)
+        }
+
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:])
+    }
+
+    /// Render the idle Dochi to a transparent CGImage at the given canvas size.
+    private static func dochiCGImage(canvas: CGFloat, appearance: DochiAppearance) -> CGImage? {
+        let size = CGSize(width: canvas, height: canvas)
+        let skView = SKView(frame: CGRect(origin: .zero, size: size))
+        skView.allowsTransparency = true
+        let scene = SKScene(size: size)
+        scene.backgroundColor = .clear
+        scene.scaleMode = .resizeFill
+        let sprite = DochiSprite(appearance: appearance)
+        sprite.applyStaticPose(.idle)
+        let scaleNode = SKNode()
+        scaleNode.setScale(canvas / (DochiMetrics.canvasSize * 1.15))
+        scaleNode.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        scaleNode.addChild(sprite.node)
+        scene.addChild(scaleNode)
+        skView.presentScene(scene)
+        return skView.texture(from: scene)?.cgImage()
+    }
+
     /// Render a single state pose to PNG data on a transparent background.
     private static func renderPNG(state: AgentState, canvas: CGFloat) -> Data? {
         let size = CGSize(width: canvas, height: canvas)

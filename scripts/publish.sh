@@ -43,6 +43,29 @@ else
         --title "ClawdDochi $VERSION" --notes "Release $VERSION"
 fi
 
+echo "==> Generate + sign Sparkle appcast"
+# generate_appcast signs each update with the EdDSA private key from your
+# keychain and writes appcast.xml. We point the download URL at this release's
+# GitHub assets and commit appcast.xml to the app repo's main branch, which is
+# where SUFeedURL (raw.githubusercontent .../main/appcast.xml) serves it from.
+GENAPPCAST="$(find "$ROOT/build" -name generate_appcast -path '*artifacts*' 2>/dev/null | head -1)"
+if [[ -z "$GENAPPCAST" ]]; then
+    echo "!! generate_appcast not found (resolve Sparkle first). Skipping appcast." >&2
+else
+    ACDIR="$ROOT/build/release/appcast"
+    rm -rf "$ACDIR"; mkdir -p "$ACDIR"
+    cp "$DMG" "$ACDIR/"
+    "$GENAPPCAST" \
+        --download-url-prefix "https://github.com/sunggyeol/ClawdDochi/releases/download/v${VERSION}/" \
+        "$ACDIR"
+    cp "$ACDIR/appcast.xml" "$ROOT/appcast.xml"
+    git -C "$ROOT" add appcast.xml
+    if ! git -C "$ROOT" diff --cached --quiet; then
+        git -C "$ROOT" commit -m "appcast: ClawdDochi ${VERSION}"
+        git -C "$ROOT" push
+    fi
+fi
+
 echo "==> Update cask"
 # version + sha256 (url already references v#{version}/ClawdDochi-#{version}.dmg)
 /usr/bin/sed -i '' -E "s/version \"[^\"]*\"/version \"${VERSION}\"/" "$CASK"
