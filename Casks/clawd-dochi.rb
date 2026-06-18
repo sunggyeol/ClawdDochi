@@ -1,13 +1,13 @@
 cask "clawd-dochi" do
   version "1.0"
-  sha256 :no_check # replaced with the real DMG checksum at release time
+  sha256 "91fae2f74fa93c037538345366dfb01f0802cbc2f06ce9d3d1af377843483888"
 
-  url "https://github.com/sunggyeol/homebrew-clawddochi/releases/download/v#{version}/ClawdDochi-#{version}.dmg"
+  url "https://github.com/sunggyeol/ClawdDochi/releases/download/v#{version}/ClawdDochi-#{version}.dmg"
   name "ClawdDochi"
   desc "Menu-bar + desktop hedgehog pet that reacts to Claude Code sessions"
   homepage "https://github.com/sunggyeol/ClawdDochi"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: ">= :tahoe"
 
   app "ClawdDochi.app"
 
