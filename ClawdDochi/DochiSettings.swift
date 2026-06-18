@@ -87,6 +87,29 @@ enum MovementStyle: String, CaseIterable, Sendable {
     }
 }
 
+/// Global movement-speed multiplier.
+enum DochiSpeed: String, CaseIterable, Sendable {
+    case slow, normal, fast, veryFast
+
+    var multiplier: CGFloat {
+        switch self {
+        case .slow:     return 0.6
+        case .normal:   return 1.0
+        case .fast:     return 1.7
+        case .veryFast: return 2.6
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .slow:     return "Slow"
+        case .normal:   return "Normal"
+        case .fast:     return "Fast"
+        case .veryFast: return "Very Fast"
+        }
+    }
+}
+
 @MainActor
 final class DochiSettings {
     static let shared = DochiSettings()
@@ -99,6 +122,7 @@ final class DochiSettings {
         static let show = "dochi.show"
         static let driver = "dochi.driver"
         static let movement = "dochi.movement"
+        static let speed = "dochi.speed"
     }
 
     private var observers: [() -> Void] = []
@@ -139,5 +163,10 @@ final class DochiSettings {
     var movement: MovementStyle {
         get { MovementStyle(rawValue: defaults.string(forKey: Key.movement) ?? "") ?? .edgeWalk }
         set { defaults.set(newValue.rawValue, forKey: Key.movement); notify() }
+    }
+
+    var speed: DochiSpeed {
+        get { DochiSpeed(rawValue: defaults.string(forKey: Key.speed) ?? "") ?? .normal }
+        set { defaults.set(newValue.rawValue, forKey: Key.speed); notify() }
     }
 }

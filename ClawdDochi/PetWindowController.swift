@@ -64,12 +64,14 @@ final class PetWindowController: NSObject {
 
     /// Edge-walk speed per state. `waiting`/`done` stay put so the gesture reads.
     private func speed(for state: AgentState) -> CGFloat {
+        let base: CGFloat
         switch state {
-        case .idle:    return 28   // roams around when Claude is done/idle
-        case .working: return 42   // brisk pacing while busy
-        case .waiting: return 18   // keeps moving while waiting (never frozen)
-        case .done:    return 0    // briefly holds for the celebration, then idle
+        case .idle:    base = 28   // roams around when Claude is done/idle
+        case .working: base = 42   // brisk pacing while busy
+        case .waiting: base = 18   // keeps moving while waiting (never frozen)
+        case .done:    base = 0    // briefly holds for the celebration, then idle
         }
+        return base * settings.speed.multiplier
     }
 
     init(settings: DochiSettings = .shared) {

@@ -76,46 +76,34 @@ final class StatusItemController: NSObject {
     private func buildMenu() {
         let menu = NSMenu()
 
-        // Mode: react to Claude Code, or roam autonomously.
-        let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
-        let modeMenu = NSMenu()
-        for driver in DochiDriver.allCases {
-            let item = NSMenuItem(title: driver.label, action: #selector(setDriver(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = driver.rawValue
-            item.state = (settings.driver == driver) ? .on : .off
-            modeMenu.addItem(item)
-        }
-        modeItem.submenu = modeMenu
-        menu.addItem(modeItem)
-
-        // Movement style.
-        let moveItem = NSMenuItem(title: "Movement", action: nil, keyEquivalent: "")
-        let moveMenu = NSMenu()
-        for style in MovementStyle.allCases {
-            let item = NSMenuItem(title: style.label, action: #selector(setMovement(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = style.rawValue
-            item.state = (settings.movement == style) ? .on : .off
-            moveMenu.addItem(item)
-        }
-        moveItem.submenu = moveMenu
-        menu.addItem(moveItem)
+        // All option groups live at the top level (no nested "Settings").
+        menu.addItem(submenu(title: "Mode",
+            options: DochiDriver.allCases.map { ($0.label, $0.rawValue, settings.driver == $0) },
+            action: #selector(setDriver(_:))))
+        menu.addItem(submenu(title: "Movement",
+            options: MovementStyle.allCases.map { ($0.label, $0.rawValue, settings.movement == $0) },
+            action: #selector(setMovement(_:))))
+        menu.addItem(submenu(title: "Size",
+            options: DochiSize.allCases.map { ($0.label, $0.rawValue, settings.size == $0) },
+            action: #selector(setSize(_:))))
+        menu.addItem(submenu(title: "Color",
+            options: DochiAppearance.allCases.map { ($0.label, $0.rawValue, settings.appearance == $0) },
+            action: #selector(setAppearance(_:))))
+        menu.addItem(submenu(title: "Speed",
+            options: DochiSpeed.allCases.map { ($0.label, $0.rawValue, settings.speed == $0) },
+            action: #selector(setSpeed(_:))))
+        menu.addItem(submenu(title: "Completion Animation",
+            options: CelebrationStyle.allCases.map { ($0.label, $0.rawValue, settings.celebration == $0) },
+            action: #selector(setCelebration(_:))))
 
         menu.addItem(.separator())
 
-        // Show/hide the desktop pet.
         let showItem = NSMenuItem(title: "Show Dochi",
                                   action: #selector(toggleShowDochi),
                                   keyEquivalent: "")
         showItem.target = self
         showItem.state = settings.showDochi ? .on : .off
         menu.addItem(showItem)
-
-        // Settings submenu: size, color scheme, completion animation.
-        let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        settingsItem.submenu = makeSettingsMenu()
-        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
@@ -131,6 +119,23 @@ final class StatusItemController: NSObject {
                      keyEquivalent: "q")
 
         statusItem.menu = menu
+    }
+
+    /// Build a checkmarked submenu item from (label, rawValue, isOn) options.
+    private func submenu(title: String,
+                         options: [(label: String, raw: String, on: Bool)],
+                         action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        for o in options {
+            let mi = NSMenuItem(title: o.label, action: action, keyEquivalent: "")
+            mi.target = self
+            mi.representedObject = o.raw
+            mi.state = o.on ? .on : .off
+            sub.addItem(mi)
+        }
+        item.submenu = sub
+        return item
     }
 
     @objc private func setDriver(_ sender: NSMenuItem) {
@@ -192,53 +197,6 @@ final class StatusItemController: NSObject {
         updater.checkForUpdates()
     }
 
-    // MARK: - Settings menu
-
-    private func makeSettingsMenu() -> NSMenu {
-        let menu = NSMenu()
-
-        // Size
-        let sizeItem = NSMenuItem(title: "Size", action: nil, keyEquivalent: "")
-        let sizeMenu = NSMenu()
-        for size in DochiSize.allCases {
-            let item = NSMenuItem(title: size.label, action: #selector(setSize(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = size.rawValue
-            item.state = (settings.size == size) ? .on : .off
-            sizeMenu.addItem(item)
-        }
-        sizeItem.submenu = sizeMenu
-        menu.addItem(sizeItem)
-
-        // Appearance (color scheme)
-        let appItem = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
-        let appMenu = NSMenu()
-        for appearance in DochiAppearance.allCases {
-            let item = NSMenuItem(title: appearance.label, action: #selector(setAppearance(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = appearance.rawValue
-            item.state = (settings.appearance == appearance) ? .on : .off
-            appMenu.addItem(item)
-        }
-        appItem.submenu = appMenu
-        menu.addItem(appItem)
-
-        // Completion animation
-        let celItem = NSMenuItem(title: "Completion Animation", action: nil, keyEquivalent: "")
-        let celMenu = NSMenu()
-        for style in CelebrationStyle.allCases {
-            let item = NSMenuItem(title: style.label, action: #selector(setCelebration(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = style.rawValue
-            item.state = (settings.celebration == style) ? .on : .off
-            celMenu.addItem(item)
-        }
-        celItem.submenu = celMenu
-        menu.addItem(celItem)
-
-        return menu
-    }
-
     @objc private func setSize(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let v = DochiSize(rawValue: raw) else { return }
         settings.size = v
@@ -256,6 +214,12 @@ final class StatusItemController: NSObject {
         settings.celebration = v
         // Preview the chosen animation immediately.
         appController.setState(.done)
+        buildMenu()
+    }
+
+    @objc private func setSpeed(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let v = DochiSpeed(rawValue: raw) else { return }
+        settings.speed = v
         buildMenu()
     }
 
