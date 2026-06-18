@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>ClawdDochi</title>
+        <item>
+            <title>1.1</title>
+            <pubDate>Thu, 18 Jun 2026 22:22:32 +0900</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.2</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/sunggyeol/ClawdDochi/releases/download/v1.1/ClawdDochi-1.1.dmg" length="1931510" type="application/octet-stream" sparkle:edSignature="+kDVckheR9gwhY4BRLHtuppIYtnqy43NY27V+ZOMw3gE24UjG2ghuXp+vBvtDuK8sW7emdZ8E1S6kGnBkoKHDg=="/>
+        </item>
+    </channel>
+</rss>
