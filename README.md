@@ -1,6 +1,6 @@
 # ClawdDochi
 
-A tiny hedgehog that reacts to Claude Code from your menu bar and desktop.
+A tiny hedgehog that roams your screen and reacts to Claude Code.
 
 <img width="800" height="623" alt="dochi" src="https://github.com/user-attachments/assets/bc3e8973-b412-4711-aa13-8320867d2486" />
 
