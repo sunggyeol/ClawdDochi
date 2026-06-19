@@ -207,6 +207,14 @@ final class DochiSprite {
     /// Trot the legs: each foot bobs up/down, the pairs in opposite phase, at a
     /// speed that matches the state. Runs continuously so Dochi always looks
     /// like it's padding along.
+    /// Stop the leg animation and rest the feet (used when motion is disabled).
+    func stopLegs() {
+        for foot in feet {
+            foot.removeAction(forKey: "legs")
+            foot.position = .zero
+        }
+    }
+
     func animateLegs(for state: AgentState) {
         let period: TimeInterval
         let lift: CGFloat

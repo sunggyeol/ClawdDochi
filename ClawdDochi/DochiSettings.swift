@@ -124,6 +124,7 @@ final class DochiSettings {
         static let movement = "dochi.movement"
         static let speed = "dochi.speed"
         static let customImage = "dochi.customImage"
+        static let motion = "dochi.motion"
     }
 
     private var observers: [() -> Void] = []
@@ -169,6 +170,14 @@ final class DochiSettings {
     var speed: DochiSpeed {
         get { DochiSpeed(rawValue: defaults.string(forKey: Key.speed) ?? "") ?? .normal }
         set { defaults.set(newValue.rawValue, forKey: Key.speed); notify() }
+    }
+
+    /// Whether Dochi moves/animates. Defaults to true; the image handlers set it
+    /// (on for the built-in Dochi, off for a custom image) but the user can
+    /// override it from Settings.
+    var motionEnabled: Bool {
+        get { defaults.object(forKey: Key.motion) == nil ? true : defaults.bool(forKey: Key.motion) }
+        set { defaults.set(newValue, forKey: Key.motion); notify() }
     }
 
     /// Path to a user-supplied PNG/SVG used in place of the procedural Dochi.

@@ -229,6 +229,15 @@ final class PetWindowController: NSObject {
         node.setScale(1); node.zRotation = 0
         node.position = baseNodePosition   // recover from any interrupted hop
 
+        // Motion off: Dochi still roams the screen, but with NO in-place
+        // animation (no legs, breathing, gestures, or celebration). Used for
+        // custom images by default. `done` keeps roaming (no one-shot hop).
+        if !settings.motionEnabled {
+            dochi.stopLegs()
+            wanderSpeed = speed(for: effective == .done ? .idle : effective)
+            return
+        }
+
         // Legs animate independently of the body gesture.
         dochi.animateLegs(for: effective)
 

@@ -104,6 +104,10 @@ final class StatusItemController: NSObject {
             options: DochiSpeed.allCases.map { ($0.label, $0.rawValue, settings.speed == $0) },
             action: #selector(setSpeed(_:))))
         settingsMenu.addItem(imageMenuItem())
+        let motionItem = NSMenuItem(title: "Motion", action: #selector(toggleMotion), keyEquivalent: "")
+        motionItem.target = self
+        motionItem.state = settings.motionEnabled ? .on : .off
+        settingsMenu.addItem(motionItem)
         settingsMenu.addItem(submenu(title: "Completion Animation",
             options: CelebrationStyle.allCases.map { ($0.label, $0.rawValue, settings.celebration == $0) },
             action: #selector(setCelebration(_:))))
@@ -246,8 +250,14 @@ final class StatusItemController: NSObject {
         buildMenu()
     }
 
+    @objc private func toggleMotion() {
+        settings.motionEnabled.toggle()
+        buildMenu()
+    }
+
     @objc private func useDefaultImage() {
         settings.customImagePath = nil
+        settings.motionEnabled = true   // built-in Dochi animates by default
         buildMenu()
     }
 
@@ -261,6 +271,7 @@ final class StatusItemController: NSObject {
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.customImagePath = url.path
+        settings.motionEnabled = false  // custom images are static by default
         buildMenu()
     }
 

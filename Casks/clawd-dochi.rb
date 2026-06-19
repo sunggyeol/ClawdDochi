@@ -1,6 +1,6 @@
 cask "clawd-dochi" do
-  version "1.2"
-  sha256 "2fcf92a5ce5e996dd8f79e62efa2f4a0a489d787d3ebfcd6d124ad10cb3ddaac"
+  version "1.3"
+  sha256 "bc19bcac814e8a07722ce6f5faddd85a0b2c70385a2a2688d1832a560e81e229"
 
   url "https://github.com/sunggyeol/ClawdDochi/releases/download/v#{version}/ClawdDochi-#{version}.dmg"
   name "ClawdDochi"
