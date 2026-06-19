@@ -145,7 +145,29 @@ final class DochiSprite {
         build()
     }
 
+    /// Build from a user-supplied image (PNG/SVG) instead of the procedural
+    /// hedgehog. The image becomes a single sprite centered at the node origin,
+    /// fitted to the standard canvas size. There are no procedural feet, so the
+    /// leg-walk animation is naturally skipped; all other gestures (breathing,
+    /// bob, hop/spin celebration, sparkles, facing flip) still apply to the node.
+    init(customImage image: NSImage) {
+        self.palette = .color // unused for custom images
+        node.name = "dochiNode"
+        buildCustom(image)
+    }
+
     // MARK: - Construction
+
+    private func buildCustom(_ image: NSImage) {
+        node.removeAllChildren()
+        feet.removeAll()
+        let sprite = SKSpriteNode(texture: SKTexture(image: image))
+        let maxDim = max(image.size.width, image.size.height)
+        let scale = maxDim > 0 ? DochiMetrics.canvasSize / maxDim : 1
+        sprite.size = CGSize(width: image.size.width * scale,
+                             height: image.size.height * scale)
+        node.addChild(sprite) // SKSpriteNode is centered (anchor 0.5) at origin
+    }
 
     private func build() {
         node.removeAllChildren()

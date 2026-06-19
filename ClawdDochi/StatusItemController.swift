@@ -9,6 +9,7 @@
 //
 
 import AppKit
+import UniformTypeIdentifiers
 
 @MainActor
 final class StatusItemController: NSObject {
@@ -76,27 +77,13 @@ final class StatusItemController: NSObject {
     private func buildMenu() {
         let menu = NSMenu()
 
-        // All option groups live at the top level (no nested "Settings").
+        // Top level: how Dochi behaves + show/hide.
         menu.addItem(submenu(title: "Mode",
             options: DochiDriver.allCases.map { ($0.label, $0.rawValue, settings.driver == $0) },
             action: #selector(setDriver(_:))))
         menu.addItem(submenu(title: "Movement",
             options: MovementStyle.allCases.map { ($0.label, $0.rawValue, settings.movement == $0) },
             action: #selector(setMovement(_:))))
-        menu.addItem(submenu(title: "Size",
-            options: DochiSize.allCases.map { ($0.label, $0.rawValue, settings.size == $0) },
-            action: #selector(setSize(_:))))
-        menu.addItem(submenu(title: "Color",
-            options: DochiAppearance.allCases.map { ($0.label, $0.rawValue, settings.appearance == $0) },
-            action: #selector(setAppearance(_:))))
-        menu.addItem(submenu(title: "Speed",
-            options: DochiSpeed.allCases.map { ($0.label, $0.rawValue, settings.speed == $0) },
-            action: #selector(setSpeed(_:))))
-        menu.addItem(submenu(title: "Completion Animation",
-            options: CelebrationStyle.allCases.map { ($0.label, $0.rawValue, settings.celebration == $0) },
-            action: #selector(setCelebration(_:))))
-
-        menu.addItem(.separator())
 
         let showItem = NSMenuItem(title: "Show Dochi",
                                   action: #selector(toggleShowDochi),
@@ -104,6 +91,25 @@ final class StatusItemController: NSObject {
         showItem.target = self
         showItem.state = settings.showDochi ? .on : .off
         menu.addItem(showItem)
+
+        // Settings submenu: appearance & tuning.
+        let settingsMenu = NSMenu()
+        settingsMenu.addItem(submenu(title: "Size",
+            options: DochiSize.allCases.map { ($0.label, $0.rawValue, settings.size == $0) },
+            action: #selector(setSize(_:))))
+        settingsMenu.addItem(submenu(title: "Color",
+            options: DochiAppearance.allCases.map { ($0.label, $0.rawValue, settings.appearance == $0) },
+            action: #selector(setAppearance(_:))))
+        settingsMenu.addItem(submenu(title: "Speed",
+            options: DochiSpeed.allCases.map { ($0.label, $0.rawValue, settings.speed == $0) },
+            action: #selector(setSpeed(_:))))
+        settingsMenu.addItem(imageMenuItem())
+        settingsMenu.addItem(submenu(title: "Completion Animation",
+            options: CelebrationStyle.allCases.map { ($0.label, $0.rawValue, settings.celebration == $0) },
+            action: #selector(setCelebration(_:))))
+        let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        settingsItem.submenu = settingsMenu
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
 
@@ -119,6 +125,23 @@ final class StatusItemController: NSObject {
                      keyEquivalent: "q")
 
         statusItem.menu = menu
+    }
+
+    /// The Image submenu: built-in Dochi or a user-supplied PNG/SVG/WebP.
+    private func imageMenuItem() -> NSMenuItem {
+        let usingCustom = settings.customImagePath != nil
+        let item = NSMenuItem(title: "Image", action: nil, keyEquivalent: "")
+        let sub = NSMenu()
+        let defaultItem = NSMenuItem(title: "Default Dochi", action: #selector(useDefaultImage), keyEquivalent: "")
+        defaultItem.target = self
+        defaultItem.state = usingCustom ? .off : .on
+        sub.addItem(defaultItem)
+        let customItem = NSMenuItem(title: "Custom (PNG/SVG/WebP)…", action: #selector(chooseCustomImage), keyEquivalent: "")
+        customItem.target = self
+        customItem.state = usingCustom ? .on : .off
+        sub.addItem(customItem)
+        item.submenu = sub
+        return item
     }
 
     /// Build a checkmarked submenu item from (label, rawValue, isOn) options.
@@ -220,6 +243,24 @@ final class StatusItemController: NSObject {
     @objc private func setSpeed(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let v = DochiSpeed(rawValue: raw) else { return }
         settings.speed = v
+        buildMenu()
+    }
+
+    @objc private func useDefaultImage() {
+        settings.customImagePath = nil
+        buildMenu()
+    }
+
+    @objc private func chooseCustomImage() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.png, .svg, .webP]
+        panel.prompt = "Use Image"
+        panel.message = "Choose a PNG, SVG, or WebP to use as Dochi. It is resized to a uniform size."
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        settings.customImagePath = url.path
         buildMenu()
     }
 

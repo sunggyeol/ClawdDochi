@@ -99,9 +99,11 @@ enum PreviewExporter {
         let rect = NSRect(x: 0, y: 0, width: size, height: size)
         let radius = size * 0.2237   // macOS app-icon corner ratio
         let bg = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        // Cool blue background: high contrast against Dochi's warm cream/terracotta
+        // tones so the hedgehog stays legible even at small (Dock/Finder) sizes.
         let gradient = NSGradient(colors: [
-            NSColor(calibratedRed: 0.99, green: 0.95, blue: 0.86, alpha: 1),  // cream (top)
-            NSColor(calibratedRed: 0.97, green: 0.81, blue: 0.69, alpha: 1),  // peach (bottom)
+            NSColor(calibratedRed: 0.66, green: 0.83, blue: 0.95, alpha: 1),  // sky blue (top)
+            NSColor(calibratedRed: 0.40, green: 0.62, blue: 0.86, alpha: 1),  // deeper blue (bottom)
         ])
         gradient?.draw(in: bg, angle: -90)
 

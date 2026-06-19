@@ -123,6 +123,7 @@ final class DochiSettings {
         static let driver = "dochi.driver"
         static let movement = "dochi.movement"
         static let speed = "dochi.speed"
+        static let customImage = "dochi.customImage"
     }
 
     private var observers: [() -> Void] = []
@@ -168,5 +169,16 @@ final class DochiSettings {
     var speed: DochiSpeed {
         get { DochiSpeed(rawValue: defaults.string(forKey: Key.speed) ?? "") ?? .normal }
         set { defaults.set(newValue.rawValue, forKey: Key.speed); notify() }
+    }
+
+    /// Path to a user-supplied PNG/SVG used in place of the procedural Dochi.
+    /// nil = use the built-in hedgehog.
+    var customImagePath: String? {
+        get { defaults.string(forKey: Key.customImage) }
+        set {
+            if let v = newValue { defaults.set(v, forKey: Key.customImage) }
+            else { defaults.removeObject(forKey: Key.customImage) }
+            notify()
+        }
     }
 }

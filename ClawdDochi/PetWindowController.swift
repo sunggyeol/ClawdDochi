@@ -74,9 +74,18 @@ final class PetWindowController: NSObject {
         return base * settings.speed.multiplier
     }
 
+    /// Build the sprite from a user-supplied image if one is set, else the
+    /// procedural Dochi.
+    private static func makeSprite(_ settings: DochiSettings) -> DochiSprite {
+        if let path = settings.customImagePath, let img = NSImage(contentsOfFile: path) {
+            return DochiSprite(customImage: img)
+        }
+        return DochiSprite(appearance: settings.appearance)
+    }
+
     init(settings: DochiSettings = .shared) {
         self.settings = settings
-        self.dochi = DochiSprite(appearance: settings.appearance)
+        self.dochi = Self.makeSprite(settings)
 
         let initial = NSRect(x: 0, y: 0,
                              width: DochiMetrics.canvasSize, height: DochiMetrics.canvasSize)
@@ -161,7 +170,7 @@ final class PetWindowController: NSObject {
     /// from the Settings menu), then re-apply the current gesture.
     func applySettings() {
         dochi.node.removeFromParent()
-        dochi = DochiSprite(appearance: settings.appearance)
+        dochi = Self.makeSprite(settings)
         scaleContainer.addChild(dochi.node)
         layout()
         resetMovementState()
