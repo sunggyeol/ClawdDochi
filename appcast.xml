@@ -3,12 +3,12 @@
     <channel>
         <title>ClawdDochi</title>
         <item>
-            <title>1.4</title>
-            <pubDate>Fri, 19 Jun 2026 16:40:35 +0900</pubDate>
-            <sparkle:version>5</sparkle:version>
-            <sparkle:shortVersionString>1.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.2</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/sunggyeol/ClawdDochi/releases/download/v1.4/ClawdDochi-1.4.dmg" length="1955293" type="application/octet-stream" sparkle:edSignature="Fu4bvXme7JQo6RQKkLW6fYPgLUT3iT9jb1k83WaUONjLgKwWWaHhDvamc4EtW11/coqlYZGrLhQIxQpjNGI4Ag=="/>
+            <title>1.5</title>
+            <pubDate>Mon, 22 Jun 2026 10:57:26 +0900</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/sunggyeol/ClawdDochi/releases/download/v1.5/ClawdDochi-1.5.dmg" length="2000666" type="application/octet-stream" sparkle:edSignature="7DJqAPHKdW8eQ132O9w6edyR/l9IyR3i78ZZAkunc6MgaqYW1PYjFCF3YiHswKDGj79UcUGo/OSqOA2MXIA+DA=="/>
         </item>
     </channel>
 </rss>
